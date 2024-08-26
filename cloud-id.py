@@ -1,35 +1,13 @@
 import argparse
 import requests
-from pathlib import Path
-import os, sys
 import json
 import ipaddress
-import dns.resolver
+# import dns.resolver
 
 
 # AWS
 # https://docs.aws.amazon.com/vpc/latest/userguide/aws-ip-ranges.html
 AWS_IP_URL = 'https://ip-ranges.amazonaws.com/ip-ranges.json'
-AWS_JSON_FORMAT = {
-  "syncToken": "0123456789",
-  "createDate": "yyyy-mm-dd-hh-mm-ss",
-  "prefixes": [
-    {
-      "ip_prefix": "cidr",
-      "region": "region",
-      "network_border_group": "network_border_group",
-      "service": "subset"
-    }
-  ],
-  "ipv6_prefixes": [
-    {
-      "ipv6_prefix": "cidr",
-      "region": "region",
-      "network_border_group": "network_border_group",
-      "service": "subset"
-    }
-  ]  
-}
 
 # Azure
 # https://www.microsoft.com/en-us/download/details.aspx?id=56519
@@ -37,35 +15,46 @@ AWS_JSON_FORMAT = {
 # TODO make dynamic
 AZURE_IP_URL = 'https://download.microsoft.com/download/7/1/D/71D86715-5596-4529-9B13-DA13A5DE5B63/ServiceTags_Public_20240819.json'
 
-# GCP 
+# GCP
 GCP_IP_URL = 'https://www.gstatic.com/ipranges/cloud.json'
 
 # Cloudflare
+# https://developers.cloudflare.com/api/operations/cloudflare-i-ps-cloudflare-ip-details
 CLOUDFLARE_IP_URL = 'https://api.cloudflare.com/client/v4/ips'
 
+# Fastly
+# https://www.fastly.com/documentation/reference/api/utils/public-ip-list/
+FASTLY_IP_URL = 'https://api.fastly.com/public-ip-list'
 
-def load_aws(force_refresh:bool=False, never_refresh:bool=False):
+
+def load_aws(force_refresh: bool = False, never_refresh: bool = False):
     if not force_refresh and not never_refresh:
-        pass # todo
+        pass  # TODO
     return requests.get(AWS_IP_URL).json()
 
 
-def load_azure(force_refresh:bool=False, never_refresh:bool=False):
+def load_azure(force_refresh: bool = False, never_refresh: bool = False):
     if not force_refresh and not never_refresh:
-        pass # todo
+        pass  # TODO
     return requests.get(AZURE_IP_URL).json()
 
 
-def load_gcp(force_refresh:bool=False, never_refresh:bool=False):
+def load_gcp(force_refresh: bool = False, never_refresh: bool = False):
     if not force_refresh and not never_refresh:
-        pass # todo
+        pass  # TODO
     return requests.get(GCP_IP_URL).json()
 
 
-def load_cloudflare(force_refresh:bool=False, never_refresh:bool=False):
+def load_cloudflare(force_refresh: bool = False, never_refresh: bool = False):
     if not force_refresh and not never_refresh:
-        pass # todo
+        pass  # TODO
     return requests.get(CLOUDFLARE_IP_URL).json()['result']
+
+
+def load_fastly(force_refresh: bool = False, never_refresh: bool = False):
+    if not force_refresh and not never_refresh:
+        pass  # TODO
+    return requests.get(FASTLY_IP_URL).json()
 
 
 def is_gcp(address, gcp):
@@ -101,7 +90,7 @@ def is_aws(address, aws):
                     continue
                 return prefix['service']
     # Default
-    return(False)
+    return (False)
 
 
 def is_azure(address, azure):
@@ -126,13 +115,27 @@ def is_cloudflare(address, clf):
                 return 'Unknown'
 
 
-def check_addresses(addresses:list):
-    results = {'azure':{}, 'gcp':{}, 'aws':{}, 'cloudflare': {}, "not_found": 0}
+def is_fastly(address, fast):
+    _addr = ipaddress.ip_address(address)
+    if _addr.version == 4:
+        for prefix in fast['addresses']:
+            if _addr in ipaddress.ip_network(prefix):
+                return 'Unknown'
+    if _addr.version == 6:
+        for prefix in fast['ipv6_addresses']:
+            if _addr in ipaddress.ip_network(prefix):
+                return 'Unknown'
+
+
+def check_addresses(addresses: list):
+    results = {'azure': {}, 'gcp': {}, 'aws': {},
+               'cloudflare': [], "not_found": 0, 'fastly': []}
     aws = load_aws()
     gcp = load_gcp()
     azure = load_azure()
     clf = load_cloudflare()
-    
+    fast = load_fastly()
+
     for ip in addresses:
         # Check AWS
         ip = ip.strip()
@@ -161,19 +164,26 @@ def check_addresses(addresses:list):
             else:
                 results['gcp'][service].append(ip)
             continue
-        
+
+        # The following services don't specify services.
+        # They're mostly CDN type services.
+
+        # Check Cloudflare
         service = is_cloudflare(ip, clf)
         if service:
-            if service not in results['cloudflare'].keys():
-                results['cloudflare'][service] = [ip,]
-            else:
-                results['cloudflare'][service].append(ip)
+            results['cloudflare'].append(ip)
+            continue
+
+        # Check Fastly
+        service = is_fastly(ip, fast)
+        if service:
+            results['fastly'].append(ip)
             continue
 
         results['not_found'] = results['not_found'] + 1
-        
+
     return results
-        
+
 
 # def resolve(hostname):
 #     res = dns.resolver.make_resolver_at('1.1.1.1')
@@ -189,7 +199,8 @@ def check_addresses(addresses:list):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('file', help="File containing IP addresses to check, one per line")
+    parser.add_argument(
+        'file', help="File containing IP addresses to check, one per line")
 
     args = parser.parse_args()
     addresses = []
@@ -197,7 +208,6 @@ def main():
         addresses = f.readlines()
     res = check_addresses(addresses)
     print(json.dumps(res))
-
 
 
 if __name__ == '__main__':

@@ -24,6 +24,6 @@ We should probably vendor those and update at some interval, but that's hard.
 - [ ] Make `pip install`-able
 - [ ] Add more providers
     - [ ] Akami
-    - [ ] Fastly
+    - [x] Fastly
     - [x] Cloudflare
     - [ ] Everyone else
