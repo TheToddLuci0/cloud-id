@@ -2,11 +2,12 @@ import argparse
 import requests
 from pathlib import Path
 import os, sys
-from pprint import pprint
+import json
 import ipaddress
 import dns.resolver
 
 
+# AWS
 # https://docs.aws.amazon.com/vpc/latest/userguide/aws-ip-ranges.html
 AWS_IP_URL = 'https://ip-ranges.amazonaws.com/ip-ranges.json'
 AWS_JSON_FORMAT = {
@@ -39,6 +40,9 @@ AZURE_IP_URL = 'https://download.microsoft.com/download/7/1/D/71D86715-5596-4529
 # GCP 
 GCP_IP_URL = 'https://www.gstatic.com/ipranges/cloud.json'
 
+# Cloudflare
+CLOUDFLARE_IP_URL = 'https://api.cloudflare.com/client/v4/ips'
+
 
 def load_aws(force_refresh:bool=False, never_refresh:bool=False):
     if not force_refresh and not never_refresh:
@@ -56,6 +60,13 @@ def load_gcp(force_refresh:bool=False, never_refresh:bool=False):
     if not force_refresh and not never_refresh:
         pass # todo
     return requests.get(GCP_IP_URL).json()
+
+
+def load_cloudflare(force_refresh:bool=False, never_refresh:bool=False):
+    if not force_refresh and not never_refresh:
+        pass # todo
+    return requests.get(CLOUDFLARE_IP_URL).json()['result']
+
 
 def is_gcp(address, gcp):
     _addr = ipaddress.ip_address(address)
@@ -103,11 +114,25 @@ def is_azure(address, azure):
     return False
 
 
+def is_cloudflare(address, clf):
+    _addr = ipaddress.ip_address(address)
+    if _addr.version == 4:
+        for prefix in clf['ipv4_cidrs']:
+            if _addr in ipaddress.ip_network(prefix):
+                return 'Unknown'
+    if _addr.version == 6:
+        for prefix in clf['ipv6_cidrs']:
+            if _addr in ipaddress.ip_network(prefix):
+                return 'Unknown'
+
+
 def check_addresses(addresses:list):
-    results = {'azure':{}, 'gcp':{}, 'aws':{}, "not_found": 0}
+    results = {'azure':{}, 'gcp':{}, 'aws':{}, 'cloudflare': {}, "not_found": 0}
     aws = load_aws()
     gcp = load_gcp()
     azure = load_azure()
+    clf = load_cloudflare()
+    
     for ip in addresses:
         # Check AWS
         ip = ip.strip()
@@ -136,6 +161,14 @@ def check_addresses(addresses:list):
             else:
                 results['gcp'][service].append(ip)
             continue
+        
+        service = is_cloudflare(ip, clf)
+        if service:
+            if service not in results['cloudflare'].keys():
+                results['cloudflare'][service] = [ip,]
+            else:
+                results['cloudflare'][service].append(ip)
+            continue
 
         results['not_found'] = results['not_found'] + 1
         
@@ -163,7 +196,7 @@ def main():
     with open(args.file, 'r') as f:
         addresses = f.readlines()
     res = check_addresses(addresses)
-    pprint(res)
+    print(json.dumps(res))
 
 
 
