@@ -8,3 +8,5 @@ Provide a list of IPs, get a list of services and providers they use.
 
 ### TODO
 - [ ] Optimize
+    - [ ] Multithread
+- [ ] Make `pip install`-able
