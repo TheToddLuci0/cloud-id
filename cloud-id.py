@@ -13,7 +13,7 @@ AWS_IP_URL = 'https://ip-ranges.amazonaws.com/ip-ranges.json'
 # https://www.microsoft.com/en-us/download/details.aspx?id=56519
 # This reaks of microsoft's hard to track download url scheme.
 # TODO make dynamic
-AZURE_IP_URL = 'https://download.microsoft.com/download/7/1/D/71D86715-5596-4529-9B13-DA13A5DE5B63/ServiceTags_Public_20240819.json'
+AZURE_IP_URL = 'https://download.microsoft.com/download/7/1/D/71D86715-5596-4529-9B13-DA13A5DE5B63/ServiceTags_Public_20240909.json'
 
 # GCP
 GCP_IP_URL = 'https://www.gstatic.com/ipranges/cloud.json'
