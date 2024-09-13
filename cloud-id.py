@@ -137,6 +137,9 @@ def check_addresses(addresses: list):
     fast = load_fastly()
 
     for ip in addresses:
+        if len(ip) == 0:
+            # Empty line in input file?
+            continue
         # Check AWS
         ip = ip.strip()
         service = is_aws(ip, aws)
